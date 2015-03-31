@@ -3,7 +3,7 @@
   "node": true,
   "esnext": true,
   "maxparams": 5,
-  "maxcomplexity": 9,
+  "maxcomplexity": 10,
   "globals": {
     "describe": true,
     "it": true

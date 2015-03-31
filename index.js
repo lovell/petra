@@ -59,17 +59,14 @@ FileLocker.prototype.unlock = function(file) {
     if (this.lockedFiles.get(file).onRelease.length > 0) {
       // Transfer lock
       this.lockedFiles.get(file).lastUpdated = Date.now();
-      const that = this;
-      process.nextTick(function() {
-        that.lockedFiles.get(file).onRelease.shift()();
-      });
+      this.lockedFiles.get(file).onRelease.shift()();
     } else {
       // Remove empty lock
       this.lockedFiles['delete'](file);
     }
   }
 };
-  
+
 // Petra object
 
 const Petra = function(options) {
@@ -79,7 +76,10 @@ const Petra = function(options) {
   this.minimumTtl = options.minimumTtl || 7 * 24 * 60 * 60;  // 7 days, in seconds
   this.cachePurgeInterval = options.cachePurgeInterval || 60 * 60;  // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
-  this.log = options.log || console.log;
+  this.log = options.log || function(msg) {
+    console.log((new Date()).toISOString() + ' petra ' + msg);
+  };
+  this.debug = options.debug || false;
   // Cache directory
   this.cacheDirectory = options.cacheDirectory || path.join(os.tmpdir(), 'petra');
   fs.mkdir(this.cacheDirectory, '0755', function(err) {
@@ -155,38 +155,65 @@ Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
     self.fetchFromFilesystem(bucket, filename, function(err, filesystemHit, atime, mtime) {
       if (err) {
         // Filesystem error
+        if (self.debug) {
+          self.log('Filesystem error ' + filename + ' ' + err.message);
+        }
         done(err);
         locker.unlock(filename);
       } else if (filesystemHit) {
         // Filesystem hit
+        if (self.debug) {
+          self.log('Filesystem hit ' + filename);
+        }
         locker.unlock(filename);
         done(null, filename, atime, mtime);
       } else {
         // Filesystem miss
+        if (self.debug) {
+          self.log('Filesystem miss ' + filename);
+        }
         // Check peer
         self.fetchFromPeer(bucket, fingerprint, filename, function(err, peerHit, atime, mtime) {
           if (err) {
             // Peer error
+            if (self.debug) {
+              self.log('Peer error ' + filename + ' ' + err.message);
+            }
             done(err);
             locker.unlock(filename);
           } else if (peerHit) {
             // Peer hit
+            if (self.debug) {
+              self.log('Peer hit ' + filename);
+            }
             locker.unlock(filename);
             done(null, filename, atime, mtime);
           } else {
             // Peer miss
+            if (self.debug) {
+              self.log('Peer miss ' + filename);
+            }
             // Check upstream
             self.fetchFromUpstream(upstreamUrl, bucket, fingerprint, filename, function(err, upstreamHit, atime, mtime) {
               if (err) {
                 // Upstream error
+                if (self.debug) {
+                  self.log('Upstream error ' + filename + ' ' + err.message);
+                }
                 done(err);
                 locker.unlock(filename);
               } else if (upstreamHit) {
                 // Upstream hit
+                if (self.debug) {
+                  self.log('Upstream hit ' + filename);
+                }
                 locker.unlock(filename);
                 done(null, filename, atime, mtime);
               } else {
                 // Upstream miss
+                if (self.debug) {
+                  self.log('Upstream miss ' + filename);
+                }
                 done(new Error('404'));
                 locker.unlock(filename);
               }
@@ -321,19 +348,21 @@ Petra.prototype.notify = function(bucket, fingerprint) {
   const self = this;
   const peer = this.hashring.get(fingerprint);
   if (peer !== this.whoami) {
-    request.post({
-      uri: 'http://' + peer + ':' + this.port + '/notify',
-      form: {
-        bucket: bucket,
-        fingerprint: fingerprint
-      },
-      timeout: 5000
-    }, function(err, res) {
-      if (err) {
-        self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' error:' + err.message);
-      } else if (res.statusCode !== 200) {
-        self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' code:' + res.statusCode);
-      }
+    process.nextTick(function() {
+      request.post({
+        uri: 'http://' + peer + ':' + self.port + '/notify',
+        form: {
+          bucket: bucket,
+          fingerprint: fingerprint
+        },
+        timeout: 5000
+      }, function(err, res) {
+        if (err) {
+          self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' error:' + err.message);
+        } else if (res.statusCode !== 200) {
+          self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' code:' + res.statusCode);
+        }
+      });
     });
   }
 };
@@ -372,21 +401,22 @@ Petra.prototype.serve = function(req, res) {
       });
     } else if (req.method === 'GET') {
       // Request for cached content
-      serveStatic(this.cacheDirectory, {etag: false, index: false})(req, res, function(err) {
-        if (err) {
-          self.log('Could not serve static for ' + req.url + ' ' + err.message);
-          res.writeHead(404);
-          res.end();
-        }
+      serveStatic(this.cacheDirectory, {etag: false, index: false})(req, res, function(req, res) {
+        self.log('Could not serve static for ' + req.url + ' to ' + req.connection.remoteAddress);
+        res.writeHead(404);
+        res.write('Not Found');
+        res.end();
       });
     } else {
       res.writeHead(404);
+      res.write('Not Found');
       res.end();
     }
   } else {
     // Unknown remote address
     this.log('Rejected notify request from ' + req.connection.remoteAddress);
     res.writeHead(404);
+    res.write('Not Found');
     res.end();
   }
 };

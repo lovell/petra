@@ -65,13 +65,17 @@ An array of accepted `Content-Type` upstream response headers, defaulting to the
 
 #### log
 
-A function called for any warnings, defaults to `console.log`.
+A function called for any warnings, defaults to `console.log` with a timestamp prefix.
+
+#### debug
+
+Enable debug to help trace peer/upstream problems, defaults to `false`.
 
 ### fetch(url, [bucket], callback)
 
 Fetches a remote `url`, first checking with the local filesystem and the peer in the hash ring that "owns" the URL.
 
-Optionally accepts a `bucket` to partition data in the cache.
+Optionally accepts a `bucket` String to partition data in the cache.
 
 The `callback` function is passed `(err, filename, created, expires)` where:
 
