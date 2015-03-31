@@ -9,6 +9,7 @@ const querystring = require('querystring');
 const farmhash = require('farmhash');
 const HashRing = require('hashring');
 const request = require('request');
+const finalhandler = require('finalhandler');
 const serveStatic = require('serve-static');
 
 // Parse TTL from a Cache-Control response header, in seconds, defaulting to 0
@@ -120,6 +121,7 @@ const Petra = function(options) {
   http.createServer(function(req, res) {
     self.serve(req, res);
   }).listen(this.port, this.whoami);
+  this.serveStatic = serveStatic(this.cacheDirectory, {etag: false, index: false});
   // Start purge cache task
   this.purgeCacheTask = setInterval(
     function() {
@@ -401,16 +403,10 @@ Petra.prototype.serve = function(req, res) {
       });
     } else if (req.method === 'GET') {
       // Request for cached content
-      serveStatic(this.cacheDirectory, {etag: false, index: false})(req, res, function(req, res) {
-        self.log('Could not serve static for ' + req.url + ' to ' + req.connection.remoteAddress);
-        res.writeHead(404);
-        res.write('Not Found');
-        res.end();
+      const done = finalhandler(req, res, {
+        onerror: this.log
       });
-    } else {
-      res.writeHead(404);
-      res.write('Not Found');
-      res.end();
+      this.serveStatic(req, res, done);
     }
   } else {
     // Unknown remote address
