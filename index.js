@@ -75,7 +75,7 @@ const Petra = function(options) {
   // Parse options
   this.port = options.port || 8209;
   this.minimumTtl = options.minimumTtl || 7 * 24 * 60 * 60;  // 7 days, in seconds
-  this.cachePurgeInterval = options.cachePurgeInterval || 60 * 60;  // 1 hour, in seconds
+  this.purgeStaleInterval = options.purgeStaleInterval || 60 * 60;  // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
   this.log = options.log || function(msg) {
     console.log((new Date()).toISOString() + ' petra ' + msg);
@@ -123,11 +123,11 @@ const Petra = function(options) {
   }).listen(this.port, this.whoami);
   this.serveStatic = serveStatic(this.cacheDirectory, {etag: false, index: false});
   // Start purge cache task
-  this.purgeCacheTask = setInterval(
+  this.purgeStaleTask = setInterval(
     function() {
-      self.purgeCache(self.cacheDirectory);
+      self.purgeStale(self.cacheDirectory);
     },
-    this.cachePurgeInterval * 1000
+    this.purgeStaleInterval * 1000
   );
 };
 module.exports = Petra;
@@ -417,7 +417,26 @@ Petra.prototype.serve = function(req, res) {
   }
 };
 
-Petra.prototype.purgeCache = function(directory) {
+Petra.prototype.purge = function(upstreamUrl, bucket, done) {
+  // Bucket
+  if (typeof bucket === 'function' && typeof done === 'undefined') {
+    // No bucket required
+    done = bucket;
+    bucket = '';
+  }
+  // Fingerprint and filename
+  const fingerprint = farmhash.fingerprint64(upstreamUrl);
+  const filename = this.cacheFilePath(bucket, fingerprint);
+  // Lock
+  locker.lock(filename, function() {
+    fs.unlink(filename, function() {
+      locker.unlock(filename);
+      done();
+    });
+  });
+};
+
+Petra.prototype.purgeStale = function(directory) {
   const self = this;
   fs.readdir(directory, function(err, files) {
     if (!err) {
@@ -426,7 +445,7 @@ Petra.prototype.purgeCache = function(directory) {
         fs.stat(filePath, function(err, stats) {
           if (!err && stats && stats.isDirectory()) {
             // Recurse into directory
-            self.purgeCache(filePath);
+            self.purgeStale(filePath);
           } else if (stats && stats.isFile() && stats.mtime.getTime() < Date.now()) {
             // Remove stale file
             locker.lock(filePath, function() {

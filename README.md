@@ -55,7 +55,7 @@ The minimum TTL for cached items in seconds, defaults to 7 days.
 
 The TTL for each response will be the minimum of this value or the max age of the upstream HTTP `Cache-Control` response header.
 
-#### cachePurgeInterval
+#### purgeStaleInterval
 
 The interval in seconds between purges of stale content in the cache, defaults to 1 hour.
 
@@ -83,6 +83,10 @@ The `callback` function is passed `(err, filename, created, expires)` where:
 - `filename` is the path to the local file containing the response.
 - `created` is the Date when the response was originally cached.
 - `expires` is the Date when the response will become stale.
+
+### purge(url, [bucket], callback)
+
+Removes cached copy of the URL, if any, from the local filesystem only.
 
 ## Licence
 
