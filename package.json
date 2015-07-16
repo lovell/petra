@@ -18,14 +18,14 @@
   ],
   "dependencies": {
     "farmhash": "^1.0.0",
-    "hashring": "^3.1.0",
-    "request": "^2.53.0",
-    "finalhandler": "^0.3.4",
-    "serve-static": "^1.9.2"
+    "hashring": "^3.1.1",
+    "request": "^2.58.0",
+    "finalhandler": "^0.4.0",
+    "serve-static": "^1.10.0"
   },
   "devDependencies": {
-    "mocha": "^2.2.1",
-    "mocha-jshint": "^1.0.0"
+    "mocha": "^2.2.5",
+    "mocha-jshint": "^2.2.3"
   },
   "license": "Apache 2.0",
   "engines": {
