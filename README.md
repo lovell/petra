@@ -1,6 +1,6 @@
 # petra
 
-Embed a caching, reverse HTTP proxy into an existing ECMAScript 6 web application.
+Embed a caching, reverse HTTP proxy into an existing ES2015 application.
 
 Features:
 
@@ -45,6 +45,10 @@ Required. The array of IP addresses in the HashRing. Private IP addresses can be
 
 The directory in which to store cached items, defaulting to `/tmp/petra`.
 
+#### hash
+
+A function to generate cache keys, defaults to SHA-256.
+
 #### port
 
 The HTTP port for nodes within a ring to communicate, defaulting to 8209.
@@ -63,13 +67,17 @@ The interval in seconds between purges of stale content in the cache, defaults t
 
 An array of accepted `Content-Type` upstream response headers, defaulting to the empty list and therefore allowing any.
 
-#### log
+#### timeout
 
-A function called for any warnings, defaults to `console.log` with a timestamp prefix.
+The length of time to wait for an upstream source to provide data, defaulting to 10000ms.
 
 #### debug
 
 Enable debug to help trace peer/upstream problems, defaults to `false`.
+
+#### log
+
+The function to call with debug messages, defaults to `console.log` with a timestamp prefix.
 
 ### fetch(url, [bucket], callback)
 
@@ -90,7 +98,7 @@ Removes cached copy of the URL, if any, from the local filesystem only.
 
 ## Licence
 
-Copyright 2015 Lovell Fuller.
+Copyright 2015, 2016 Lovell Fuller.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

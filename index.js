@@ -4,16 +4,16 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const crypto = require('crypto');
 const querystring = require('querystring');
 
-const farmhash = require('farmhash');
 const HashRing = require('hashring');
 const request = require('request');
 const finalhandler = require('finalhandler');
 const serveStatic = require('serve-static');
 
 // Parse TTL from a Cache-Control response header, in seconds, defaulting to 0
-const ttlFromCacheControlHeader = function(cacheControlHeader) {
+const ttlFromCacheControlHeader = function (cacheControlHeader) {
   let ttl = 0;
   if (
     typeof cacheControlHeader === 'string' &&
@@ -35,12 +35,12 @@ const ttlFromCacheControlHeader = function(cacheControlHeader) {
 
 // FileLocker object
 
-const FileLocker = function() {
+const FileLocker = function () {
   this.lockedFiles = new Map();
 };
 const locker = new FileLocker();
 
-FileLocker.prototype.lock = function(file, proceed) {
+FileLocker.prototype.lock = function (file, proceed) {
   if (this.lockedFiles.has(file)) {
     // Added request to existing lock
     this.lockedFiles.get(file).onRelease.push(proceed);
@@ -55,7 +55,7 @@ FileLocker.prototype.lock = function(file, proceed) {
   }
 };
 
-FileLocker.prototype.unlock = function(file) {
+FileLocker.prototype.unlock = function (file) {
   if (this.lockedFiles.has(file)) {
     if (this.lockedFiles.get(file).onRelease.length > 0) {
       // Transfer lock
@@ -70,45 +70,52 @@ FileLocker.prototype.unlock = function(file) {
 
 // Petra object
 
-const Petra = function(options) {
+const Petra = function (options) {
   const self = this;
   // Parse options
   this.port = options.port || 8209;
   this.minimumTtl = options.minimumTtl || 7 * 24 * 60 * 60;  // 7 days, in seconds
   this.purgeStaleInterval = options.purgeStaleInterval || 60 * 60;  // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
-  this.log = options.log || function(msg) {
+  this.log = options.log || function (msg) {
     console.log((new Date()).toISOString() + ' petra ' + msg);
   };
   this.debug = options.debug || false;
-  // Cache directory
+  this.timeout = options.timeout || 10000; // 10 seconds
+  // Cache
   this.cacheDirectory = options.cacheDirectory || path.join(os.tmpdir(), 'petra');
-  fs.mkdir(this.cacheDirectory, '0755', function(err) {
+  fs.mkdir(this.cacheDirectory, '0755', function (err) {
     if (err && err.code !== 'EEXIST') {
       throw new Error('Could not create cacheDirectory ' + err.message);
     }
   });
+  // Hash function, default to sha256
+  this.hash = options.hash || function (str) {
+    const sha256 = crypto.createHash('sha256');
+    sha256.update(str);
+    return sha256.digest('hex');
+  };
   // Hash ring
   if (Array.isArray(options.ring)) {
     this.hashring = new HashRing(options.ring);
     // Discover external IPv4 addresses
-    const externalIPv4Addresses = (function() {
+    const externalIPv4Addresses = (function () {
       const interfaces = os.networkInterfaces();
-      return Object.keys(interfaces).map(function(name) {
-        return interfaces[name].filter(function(item) {
+      return Object.keys(interfaces).map(function (name) {
+        return interfaces[name].filter(function (item) {
           // Filter to include only IPv4 and external
           return (item.family === 'IPv4' && item.internal === false);
-        }).map(function(item) {
+        }).map(function (item) {
           // Return the matching addresses
           return item.address;
         });
-      }).reduce(function(a, b) {
+      }).reduce(function (a, b) {
         // Flatten array
         return a.concat(b);
       });
     })();
     // Verify hash ring contains exactly one of my external IPv4 addresses
-    const myIpAddresses = options.ring.filter(function(entry) {
+    const myIpAddresses = options.ring.filter(function (entry) {
       return (externalIPv4Addresses.indexOf(entry) !== -1);
     });
     if (myIpAddresses.length === 1) {
@@ -118,13 +125,13 @@ const Petra = function(options) {
     }
   }
   // Start HTTP server
-  http.createServer(function(req, res) {
+  http.createServer(function (req, res) {
     self.serve(req, res);
   }).listen(this.port, this.whoami);
   this.serveStatic = serveStatic(this.cacheDirectory, {etag: false, index: false});
   // Start purge cache task
   this.purgeStaleTask = setInterval(
-    function() {
+    function () {
       self.purgeStale(self.cacheDirectory);
     },
     this.purgeStaleInterval * 1000
@@ -132,7 +139,7 @@ const Petra = function(options) {
 };
 module.exports = Petra;
 
-Petra.prototype.cacheFilePath = function(bucket, fingerprint) {
+Petra.prototype.cacheFilePath = function (bucket, fingerprint) {
   if (typeof bucket === 'string' && bucket.length !== 0) {
     return path.join(this.cacheDirectory, bucket, fingerprint);
   } else {
@@ -140,7 +147,7 @@ Petra.prototype.cacheFilePath = function(bucket, fingerprint) {
   }
 };
 
-Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
+Petra.prototype.fetch = function (upstreamUrl, bucket, done) {
   const self = this;
   // Bucket
   if (typeof bucket === 'function' && typeof done === 'undefined') {
@@ -149,12 +156,12 @@ Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
     bucket = '';
   }
   // Fingerprint and filename
-  const fingerprint = farmhash.fingerprint64(upstreamUrl);
+  const fingerprint = self.hash(upstreamUrl);
   const filename = self.cacheFilePath(bucket, fingerprint);
   // Lock
-  locker.lock(filename, function() {
+  locker.lock(filename, function () {
     // Check local filesystem
-    self.fetchFromFilesystem(bucket, filename, function(err, filesystemHit, atime, mtime) {
+    self.fetchFromFilesystem(bucket, filename, function (err, filesystemHit, atime, mtime) {
       if (err) {
         // Filesystem error
         if (self.debug) {
@@ -175,7 +182,7 @@ Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
           self.log('Filesystem miss ' + filename);
         }
         // Check peer
-        self.fetchFromPeer(bucket, fingerprint, filename, function(err, peerHit, atime, mtime) {
+        self.fetchFromPeer(bucket, fingerprint, filename, function (err, peerHit, atime, mtime) {
           if (err) {
             // Peer error
             if (self.debug) {
@@ -196,7 +203,7 @@ Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
               self.log('Peer miss ' + filename);
             }
             // Check upstream
-            self.fetchFromUpstream(upstreamUrl, bucket, fingerprint, filename, function(err, upstreamHit, atime, mtime) {
+            self.fetchFromUpstream(upstreamUrl, bucket, fingerprint, filename, function (err, upstreamHit, atime, mtime) {
               if (err) {
                 // Upstream error
                 if (self.debug) {
@@ -227,15 +234,15 @@ Petra.prototype.fetch = function(upstreamUrl, bucket, done) {
   });
 };
 
-Petra.prototype.fetchFromFilesystem = function(bucket, filename, done) {
+Petra.prototype.fetchFromFilesystem = function (bucket, filename, done) {
   const self = this;
-  fs.stat(filename, function(err, stats) {
+  fs.stat(filename, function (err, stats) {
     if (err && err.code === 'ENOENT') {
       // Cache miss
-      if (bucket !== '') {
+      if (typeof bucket === 'string' && bucket !== '') {
         // Ensure bucket cache directory
         const bucketCacheDirectory = path.join(self.cacheDirectory, bucket);
-        fs.mkdir(bucketCacheDirectory, '0755', function(err) {
+        fs.mkdir(bucketCacheDirectory, '0755', function (err) {
           if (err && err.code !== 'EEXIST') {
             done(new Error('Could not create cache directory ' + bucketCacheDirectory + ' ' + err.message));
           } else {
@@ -257,7 +264,7 @@ Petra.prototype.fetchFromFilesystem = function(bucket, filename, done) {
   });
 };
 
-Petra.prototype.fetchFromPeer = function(bucket, fingerprint, filename, done) {
+Petra.prototype.fetchFromPeer = function (bucket, fingerprint, filename, done) {
   if (this.hashring) {
     const peer = this.hashring.get(fingerprint);
     if (peer === this.whoami) {
@@ -267,7 +274,7 @@ Petra.prototype.fetchFromPeer = function(bucket, fingerprint, filename, done) {
       // Fetch from peer
       const peerPath = '/' + (bucket.length !== 0 ? bucket + '/' : '') + fingerprint;
       const peerUrl = 'http://' + peer + ':' + this.port + peerPath;
-      this.fetchFromUpstream(peerUrl, bucket, fingerprint, filename, function(err, hit, atime, mtime) {
+      this.fetchFromUpstream(peerUrl, bucket, fingerprint, filename, function (err, hit, atime, mtime) {
         if (err) {
           // Not found on peer
           done(null, false);
@@ -282,15 +289,15 @@ Petra.prototype.fetchFromPeer = function(bucket, fingerprint, filename, done) {
   }
 };
 
-Petra.prototype.fetchFromUpstream = function(upstreamUrl, bucket, fingerprint, filename, done) {
+Petra.prototype.fetchFromUpstream = function (upstreamUrl, bucket, fingerprint, filename, done) {
   const self = this;
   const partialFilename = filename + '.part';
   const upstream = request({
     uri: upstreamUrl,
-    timeout: 10000
+    timeout: self.timeout
   });
   let upstreamStatus = 504;  // Gateway Timeout
-  upstream.on('response', function(response) {
+  upstream.on('response', function (response) {
     upstreamStatus = parseInt(response.statusCode, 10);
     if (upstreamStatus === 200) {
       if (self.mediaTypes.length > 0 && self.mediaTypes.indexOf(response.headers['content-type']) === -1) {
@@ -301,10 +308,10 @@ Petra.prototype.fetchFromUpstream = function(upstreamUrl, bucket, fingerprint, f
         response.pause();
         // Create input file and listen for finish event
         const file = fs.createWriteStream(partialFilename);
-        file.on('finish', function() {
+        file.on('finish', function () {
           if (upstreamStatus === 200) {
             // Rename completed file
-            fs.rename(partialFilename, filename, function(err) {
+            fs.rename(partialFilename, filename, function (err) {
               if (err) {
                 done(new Error('Could not rename ' + partialFilename + ' as ' + filename + ' ' + err.message));
               } else {
@@ -313,7 +320,7 @@ Petra.prototype.fetchFromUpstream = function(upstreamUrl, bucket, fingerprint, f
                 // Set file m(odified)time to its expiry time
                 const atime = new Date();
                 const mtime = new Date(Date.now() + ttl * 1000);
-                fs.utimes(filename, atime, mtime, function(err) {
+                fs.utimes(filename, atime, mtime, function (err) {
                   if (err) {
                     done(new Error('Could not utimes ' + filename + ' ' + err.message));
                   } else {
@@ -326,7 +333,7 @@ Petra.prototype.fetchFromUpstream = function(upstreamUrl, bucket, fingerprint, f
               }
             });
           } else {
-            done(new Error('Upstream ' + upstreamUrl + ' responded with status code ' + upstreamStatus));
+            done(new Error('Upstream ' + upstreamUrl + ' status ' + upstreamStatus));
           }
         });
         // Pipe HTTP response to local file
@@ -336,21 +343,21 @@ Petra.prototype.fetchFromUpstream = function(upstreamUrl, bucket, fingerprint, f
     } else {
       // Abort non-200 upstream reponses
       upstream.abort();
-      done(new Error('Upstream ' + upstreamUrl + ' responded with status code ' + upstreamStatus));
+      done(new Error('Upstream ' + upstreamUrl + ' status ' + upstreamStatus));
     }
-  }).on('error', function(err) {
+  }).on('error', function (err) {
     // Upstream request failed, most likely timeout
-    fs.unlink(partialFilename, function() {
+    fs.unlink(partialFilename, function () {
       done(new Error('Upstream ' + upstreamUrl + ' failed ' + err.message));
     });
   });
 };
 
-Petra.prototype.notify = function(bucket, fingerprint) {
+Petra.prototype.notify = function (bucket, fingerprint) {
   const self = this;
   const peer = this.hashring.get(fingerprint);
   if (peer !== this.whoami) {
-    process.nextTick(function() {
+    process.nextTick(function () {
       request.post({
         uri: 'http://' + peer + ':' + self.port + '/notify',
         form: {
@@ -358,18 +365,20 @@ Petra.prototype.notify = function(bucket, fingerprint) {
           fingerprint: fingerprint
         },
         timeout: 5000
-      }, function(err, res) {
-        if (err) {
-          self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' error:' + err.message);
-        } else if (res.statusCode !== 200) {
-          self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' code:' + res.statusCode);
+      }, function (err, res) {
+        if (self.debug) {
+          if (err) {
+            self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' error:' + err.message);
+          } else if (res.statusCode !== 200) {
+            self.log('Notification peer:' + peer + ' fingerprint:' + fingerprint + ' code:' + res.statusCode);
+          }
         }
       });
     });
   }
 };
 
-Petra.prototype.serve = function(req, res) {
+Petra.prototype.serve = function (req, res) {
   const self = this;
   if (this.hashring.has(req.connection.remoteAddress)) {
     if (req.method === 'POST' && req.url === '/notify') {
@@ -378,22 +387,22 @@ Petra.prototype.serve = function(req, res) {
       req.on('data', function (data) {
         body = body + data;
       });
-      req.on('end', function(){
+      req.on('end', function () {
         // OK
         res.writeHead(200);
         res.end();
         // Generate local filename from params
         const params = querystring.parse(body);
         const filename = self.cacheFilePath(params.bucket, params.fingerprint);
-        fs.stat(filename, function(err, stats) {
+        fs.stat(filename, function (err, stats) {
           if (err && err.code === 'ENOENT') {
             // Not on local filesystem, request from peer that notified us
             const peerPath = '/' + (params.bucket.length !== 0 ? params.bucket + '/' : '') + params.fingerprint;
             const peerUrl = 'http://' + req.connection.remoteAddress + ':' + self.port + peerPath;
-            locker.lock(filename, function() {
-              self.fetchFromUpstream(peerUrl, params.bucket, params.fingerprint, filename, function(err) {
+            locker.lock(filename, function () {
+              self.fetchFromUpstream(peerUrl, params.bucket, params.fingerprint, filename, function (err) {
                 locker.unlock(filename);
-                if (err) {
+                if (self.debug && err) {
                   self.log('Could not fetch from peer ' + peerUrl + ' ' + err.message);
                 }
               });
@@ -410,14 +419,16 @@ Petra.prototype.serve = function(req, res) {
     }
   } else {
     // Unknown remote address
-    this.log('Rejected notify request from ' + req.connection.remoteAddress);
     res.writeHead(404);
     res.write('Not Found');
     res.end();
+    if (self.debug) {
+      this.log('Rejected notify request from ' + req.connection.remoteAddress);
+    }
   }
 };
 
-Petra.prototype.purge = function(upstreamUrl, bucket, done) {
+Petra.prototype.purge = function (upstreamUrl, bucket, done) {
   // Bucket
   if (typeof bucket === 'function' && typeof done === 'undefined') {
     // No bucket required
@@ -425,31 +436,31 @@ Petra.prototype.purge = function(upstreamUrl, bucket, done) {
     bucket = '';
   }
   // Fingerprint and filename
-  const fingerprint = farmhash.fingerprint64(upstreamUrl);
+  const fingerprint = this.hash(upstreamUrl);
   const filename = this.cacheFilePath(bucket, fingerprint);
   // Lock
-  locker.lock(filename, function() {
-    fs.unlink(filename, function() {
+  locker.lock(filename, function () {
+    fs.unlink(filename, function () {
       locker.unlock(filename);
       done();
     });
   });
 };
 
-Petra.prototype.purgeStale = function(directory) {
+Petra.prototype.purgeStale = function (directory) {
   const self = this;
-  fs.readdir(directory, function(err, files) {
+  fs.readdir(directory, function (err, files) {
     if (!err) {
-      files.forEach(function(file) {
+      files.forEach(function (file) {
         const filePath = path.join(directory, file);
-        fs.stat(filePath, function(err, stats) {
+        fs.stat(filePath, function (err, stats) {
           if (!err && stats && stats.isDirectory()) {
             // Recurse into directory
             self.purgeStale(filePath);
           } else if (stats && stats.isFile() && stats.mtime.getTime() < Date.now()) {
             // Remove stale file
-            locker.lock(filePath, function() {
-              fs.unlink(filePath, function() {
+            locker.lock(filePath, function () {
+              fs.unlink(filePath, function () {
                 locker.unlock(filePath);
               });
             });
