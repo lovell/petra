@@ -68,6 +68,12 @@ FileLocker.prototype.unlock = function (file) {
   }
 };
 
+const sha256 = function (str) {
+  const sha256 = crypto.createHash('sha256');
+  sha256.update(str);
+  return sha256.digest('hex');
+};
+
 // Petra object
 
 const Petra = function (options) {
@@ -90,14 +96,10 @@ const Petra = function (options) {
     }
   });
   // Hash function, default to sha256
-  this.hash = options.hash || function (str) {
-    const sha256 = crypto.createHash('sha256');
-    sha256.update(str);
-    return sha256.digest('hex');
-  };
+  this.hash = (typeof options.hash === 'function') ? options.hash : sha256;
   // Hash ring
   if (Array.isArray(options.ring)) {
-    this.hashring = new HashRing(options.ring);
+    this.hashring = new HashRing(options.ring, this.hash);
     // Discover external IPv4 addresses
     const externalIPv4Addresses = (function () {
       const interfaces = os.networkInterfaces();

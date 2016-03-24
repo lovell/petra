@@ -1,6 +1,6 @@
 {
   "name": "petra",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "author": "Lovell Fuller <npm@lovell.info>",
   "description": "Embed a caching, reverse HTTP proxy into an existing distributed ES2015 application. Features consistent hashing and dogpile locking.",
   "scripts": {
