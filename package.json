@@ -1,10 +1,11 @@
 {
   "name": "petra",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "author": "Lovell Fuller <npm@lovell.info>",
-  "description": "Embed a caching, reverse HTTP proxy into an existing distributed ES2015 application. Features consistent hashing and dogpile locking.",
+  "description": "ES6 reverse HTTP proxy with dogpile locking and filesystem-backed cache",
   "scripts": {
-    "test": "semistandard"
+    "test": "semistandard && ava",
+    "coverage": "nyc --reporter=html ava"
   },
   "main": "index.js",
   "repository": {
@@ -17,16 +18,17 @@
     "dogpile"
   ],
   "dependencies": {
-    "hashring": "^3.2.0",
-    "request": "^2.69.0",
-    "finalhandler": "^0.4.1",
-    "serve-static": "^1.10.2"
+    "request": "^2.74.0"
   },
   "devDependencies": {
-    "semistandard": "^7.0.5"
+    "ava": "^0.16.0",
+    "mock-fs": "^3.11.0",
+    "nock": "^8.0.0",
+    "nyc": "^8.1.0",
+    "semistandard": "^9.0.0"
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=4"
+    "node": ">=6"
   }
 }

@@ -1,17 +1,16 @@
 # petra
 
-Embed a caching, reverse HTTP proxy into an existing ES2015 application.
+Embed a reverse HTTP proxy into an existing ES6 application.
 
 Features:
 
-- Consistent hashing via the use of a hash ring
+- Filesystem-backed cache
 - Prevention of the thundering herd problem via a dogpile lock
 - Respects upstream Cache-Control headers
 
 Does not yet support:
 
 - [ ] Upstream authentication
-- [ ] Auto-discovery of nodes
 - [ ] Caching of full response headers
 - [ ] Use of If-Modified-Since
 
@@ -20,11 +19,9 @@ _This is alpha-quality software and is not yet ready for use in production envir
 ## Usage example
 
 ```javascript
-var Petra = require('petra');
-var petra = new Petra({
-  ring: ['192.168.1.1', '192.168.1.2', '192.168.1.3']
-});
-petra.fetch('http://api.upstream.com/resource', 'bucket-name', function(err, filename, created, expires) {
+import Petra from 'petra';
+const petra = new Petra();
+petra.fetch('http://api.upstream.com/resource', (err, filename, created, expires) => {
   // filename is the path to the local file containing the response
   // created is the Date when the response was originally cached
   // expires is the Date when the response will become stale
@@ -37,10 +34,6 @@ petra.fetch('http://api.upstream.com/resource', 'bucket-name', function(err, fil
 
 Where `options` is an Object containing:
 
-#### ring
-
-Required. The array of IP addresses in the HashRing. Private IP addresses can be used if all nodes are within the same VPC.
-
 #### cacheDirectory
 
 The directory in which to store cached items, defaulting to `/tmp/petra`.
@@ -48,10 +41,6 @@ The directory in which to store cached items, defaulting to `/tmp/petra`.
 #### hash
 
 A function to generate cache keys, defaults to SHA-256.
-
-#### port
-
-The HTTP port for nodes within a ring to communicate, defaulting to 8209.
 
 #### minimumTtl
 
@@ -77,22 +66,20 @@ Enable debug to help trace peer/upstream problems, defaults to `false`.
 
 #### log
 
-The function to call with debug messages, defaults to `console.log` with a timestamp prefix.
+The function to call with debug messages, defaults to `console.log`.
 
-### fetch(url, [bucket], callback)
+### fetch(url, callback)
 
-Fetches a remote `url`, first checking with the local filesystem and the peer in the hash ring that "owns" the URL.
-
-Optionally accepts a `bucket` String to partition data in the cache.
+Fetches a remote `url`, first checking with the local filesystem cache.
 
 The `callback` function is passed `(err, filename, created, expires)` where:
 
 - `err` is the error, if any.
-- `filename` is the path to the local file containing the response.
+- `filename` is the path to the cached file containing the response.
 - `created` is the Date when the response was originally cached.
 - `expires` is the Date when the response will become stale.
 
-### purge(url, [bucket], callback)
+### purge(url, callback)
 
 Removes cached copy of the URL, if any, from the local filesystem only.
 
