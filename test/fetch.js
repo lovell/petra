@@ -24,7 +24,7 @@ ava.cb.serial('successful fetch from upstream', t => {
   t.plan(6);
 
   mockFs({});
-  const upstream = nock(host)
+  const upstream = nock(host, { reqheaders: { 'user-agent': 'lovell/petra' } })
     .get(path)
     .reply(200, content);
   const petra = new Petra({
@@ -155,7 +155,7 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
   mockFs({});
   const upstream = nock(host)
     .get(path)
-    .socketDelay(2000)
+    .delay({ head: 2000 })
     .reply(200, content);
   const petra = new Petra({
     cacheDirectory,
@@ -180,7 +180,7 @@ ava.cb.serial('failed fetch from upstream due to initial delay > timeout', t => 
   mockFs({});
   const upstream = nock(host)
     .get(path)
-    .delay(2000)
+    .delay({ body: 2000 })
     .reply(200, content);
   const petra = new Petra({
     cacheDirectory,

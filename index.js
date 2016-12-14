@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const request = require('request');
+const got = require('got');
 
 // Parse TTL from a Cache-Control response header, in seconds, defaulting to 0
 const ttlFromCacheControlHeader = function (cacheControlHeader) {
@@ -68,6 +68,8 @@ const sha256 = function (str) {
   return sha256.digest('hex');
 };
 
+const noop = () => {};
+
 const purgeStale = function (directory) {
   fs.readdir(directory, (err, files) => {
     if (!err) {
@@ -100,8 +102,10 @@ const Petra = function (options) {
   this.purgeStaleInterval = options.purgeStaleInterval || 60 * 60;  // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
   this.log = options.log || console.log;
-  this.debug = options.debug ? this.log : function () {};
+  this.debug = options.debug ? this.log : noop;
   this.timeout = options.timeout || 10000; // 10 seconds
+  this.retries = options.retries || 0;
+  this.userAgent = options.userAgent || 'lovell/petra';
   // Ensure cache directory exists and has read-write access
   this.cacheDirectory = options.cacheDirectory || path.join(os.tmpdir(), 'petra');
   try {
@@ -183,56 +187,61 @@ Petra.prototype._fetchFromFilesystem = function (cachePath, filename, done) {
 
 Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   const partialContentFilename = `${filename}.part`;
-  const upstream = request({
-    uri: url,
-    timeout: this.timeout
+  const upstream = got.stream(url, {
+    timeout: this.timeout,
+    retries: this.retries,
+    headers: {
+      'user-agent': this.userAgent
+    }
   });
-  let upstreamStatus = 504;  // Gateway Timeout
+  let hasError = false;
+  let abort = noop;
+  upstream.on('request', (request) => {
+    const abortTimeoutId = setTimeout(request.abort, this.timeout);
+    abort = () => {
+      clearTimeout(abortTimeoutId);
+      request.abort();
+    };
+  });
   upstream.on('response', (response) => {
-    upstreamStatus = parseInt(response.statusCode, 10);
-    if (upstreamStatus === 200) {
-      if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
-        // Unsupported Content-Type header from upstream
-        done(new Error(`Upstream ${url} unsupported media-type ${response.headers['content-type']}`));
-      } else {
-        // Upstream ready to pipe data from
-        response.pause();
-        // Create input file and listen for finish event
-        const file = fs.createWriteStream(partialContentFilename);
-        file.on('finish', () => {
-          // Rename completed file
-          fs.rename(partialContentFilename, filename, (err) => {
-            if (err) {
-              done(new Error(`Could not rename ${partialContentFilename} as ${filename} ${err.code}`));
-            } else {
-              // Time-to-live is maximum of (Cache-Control header, configured TTL) in seconds
-              const ttl = Math.max(this.minimumTtl, ttlFromCacheControlHeader(response.headers['cache-control']));
-              // Set file m(odified)time to its expiry time
-              const atime = new Date();
-              const mtime = new Date(atime.getTime() + ttl * 1000);
-              fs.utimes(filename, atime, mtime, (err) => {
-                if (err) {
-                  done(new Error(`Could not update ${filename} ${err.code}`));
-                } else {
-                  // Success
-                  done(null, atime, mtime);
-                }
-              });
-            }
-          });
-        });
-        // Pipe HTTP response to local file
-        response.pipe(file);
-        response.resume();
-      }
+    if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
+      // Unsupported Content-Type header from upstream
+      upstream.emit('error', new Error(`Upstream ${url} unsupported media-type ${response.headers['content-type']}`));
     } else {
-      // Abort non-200 upstream reponses
-      upstream.abort();
-      done(new Error(`Upstream ${url} status ${upstreamStatus}`));
+      // Upstream ready to pipe data from
+      upstream.pause();
+      // Create input file and listen for finish event
+      const file = fs.createWriteStream(partialContentFilename);
+      file.on('finish', () => {
+        // Rename completed file
+        fs.rename(partialContentFilename, filename, (err) => {
+          if (err) {
+            done(new Error(`Could not rename ${partialContentFilename} as ${filename} ${err.code}`));
+          } else {
+            // Time-to-live is maximum of (Cache-Control header, configured TTL) in seconds
+            const ttl = Math.max(this.minimumTtl, ttlFromCacheControlHeader(response.headers['cache-control']));
+            // Set file m(odified)time to its expiry time
+            const atime = new Date();
+            const mtime = new Date(atime.getTime() + ttl * 1000);
+            fs.utimes(filename, atime, mtime, (err) => {
+              if (err) {
+                done(new Error(`Could not update ${filename} ${err.code}`));
+              } else {
+                // Success
+                done(null, atime, mtime);
+              }
+            });
+          }
+        });
+      });
+      // Pipe HTTP response to local file
+      upstream.pipe(file);
+      upstream.resume();
     }
   }).on('error', (err) => {
-    if (err.code === 'ESOCKETTIMEDOUT' || err.code === 'ETIMEDOUT') {
-      // Upstream request timeout
+    if (!hasError) {
+      hasError = true;
+      abort();
       fs.unlink(partialContentFilename, () => {
         done(new Error(`Upstream ${url} failed ${err.code}`));
       });
