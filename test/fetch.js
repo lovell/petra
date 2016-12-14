@@ -150,24 +150,19 @@ ava.cb.serial('failed fetch from upstream due to 404', t => {
 });
 
 ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
-  t.plan(2);
+  t.plan(1);
 
+  const url = 'http://127.0.0.1:50000/path';
   mockFs({});
-  const upstream = nock(host)
-    .get(path)
-    .delay({ head: 2000 })
-    .reply(200, content);
   const petra = new Petra({
     cacheDirectory,
     hash,
-    timeout: 1000
+    requestTimeout: 1000
   });
 
   petra.fetch(url, (err) => {
     // Verify error
     t.true(err instanceof Error);
-    // Verify upstream request occured
-    t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
     t.end();
@@ -185,7 +180,7 @@ ava.cb.serial('failed fetch from upstream due to initial delay > timeout', t => 
   const petra = new Petra({
     cacheDirectory,
     hash,
-    timeout: 1000
+    responseTimeout: 1000
   });
 
   petra.fetch(url, (err) => {

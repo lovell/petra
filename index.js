@@ -93,18 +93,21 @@ const purgeStale = function (directory) {
   });
 };
 
+const isNumberOrDefault = (val, def) => typeof val === 'number' ? val : def;
+
 // Petra object
 
 const Petra = function (options) {
   // Parse options
   options = options || {};
-  this.minimumTtl = options.minimumTtl || 7 * 24 * 60 * 60;  // 7 days, in seconds
-  this.purgeStaleInterval = options.purgeStaleInterval || 60 * 60;  // 1 hour, in seconds
+  this.minimumTtl = isNumberOrDefault(options.minimumTtl, 7 * 24 * 60 * 60);  // 7 days, in seconds
+  this.purgeStaleInterval = isNumberOrDefault(options.purgeStaleInterval, 60 * 60);  // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
   this.log = options.log || console.log;
   this.debug = options.debug ? this.log : noop;
-  this.timeout = options.timeout || 10000; // 10 seconds
-  this.retries = options.retries || 0;
+  this.requestTimeout = isNumberOrDefault(options.requestTimeout, 10000); // 10 seconds
+  this.responseTimeout = isNumberOrDefault(options.responseTimeout, 10000); // 10 seconds
+  this.retries = isNumberOrDefault(options.retries, 0);
   this.userAgent = options.userAgent || 'lovell/petra';
   // Ensure cache directory exists and has read-write access
   this.cacheDirectory = options.cacheDirectory || path.join(os.tmpdir(), 'petra');
@@ -188,7 +191,7 @@ Petra.prototype._fetchFromFilesystem = function (cachePath, filename, done) {
 Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   const partialContentFilename = `${filename}.part`;
   const upstream = got.stream(url, {
-    timeout: this.timeout,
+    timeout: this.requestTimeout,
     retries: this.retries,
     headers: {
       'user-agent': this.userAgent
@@ -196,13 +199,16 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   });
   let hasError = false;
   let abort = noop;
-  upstream.on('request', (request) => {
-    const abortTimeoutId = setTimeout(request.abort, this.timeout);
-    abort = () => {
-      clearTimeout(abortTimeoutId);
-      request.abort();
-    };
-  });
+  if (this.responseTimeout > 0) {
+    upstream.on('request', (request) => {
+      const abortTimeoutId = setTimeout(request.abort, this.responseTimeout);
+      abort = () => {
+        clearTimeout(abortTimeoutId);
+        request.abort();
+      };
+      upstream.on('close', () => clearTimeout(abortTimeoutId));
+    });
+  }
   upstream.on('response', (response) => {
     if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
       // Unsupported Content-Type header from upstream

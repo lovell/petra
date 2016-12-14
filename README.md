@@ -56,9 +56,13 @@ The interval in seconds between purges of stale content in the cache, defaults t
 
 An array of accepted `Content-Type` upstream response headers, defaulting to the empty list and therefore allowing any.
 
-#### timeout
+#### requestTimeout
 
-The length of time to wait for an upstream source to provide data, defaulting to 10000ms.
+The length of time to wait to connect to an upstream source, defaulting to 10000ms.
+
+#### responseTimeout
+
+The length of time to wait, after connecting, for an upstream source to provide data, defaulting to 10000ms.
 
 #### retries
 
