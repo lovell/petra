@@ -197,15 +197,9 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
       'user-agent': this.userAgent
     }
   });
-  let hasError = false;
-  let abort = noop;
   if (this.responseTimeout > 0) {
     upstream.on('request', (request) => {
       const abortTimeoutId = setTimeout(request.abort, this.responseTimeout);
-      abort = () => {
-        clearTimeout(abortTimeoutId);
-        request.abort();
-      };
       upstream.on('close', () => clearTimeout(abortTimeoutId));
     });
   }
@@ -244,14 +238,10 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
       upstream.pipe(file);
       upstream.resume();
     }
-  }).on('error', (err) => {
-    if (!hasError) {
-      hasError = true;
-      abort();
-      fs.unlink(partialContentFilename, () => {
-        done(new Error(`Upstream ${url} failed ${err.code}`));
-      });
-    }
+  }).once('error', (err) => {
+    fs.unlink(partialContentFilename, () => {
+      done(new Error(`Upstream ${url} failed ${err.code}`));
+    });
   });
 };
 
