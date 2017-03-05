@@ -1,6 +1,6 @@
 {
   "name": "petra",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "author": "Lovell Fuller <npm@lovell.info>",
   "description": "ES6 reverse HTTP proxy with dogpile locking and filesystem-backed cache",
   "scripts": {
@@ -18,14 +18,15 @@
     "dogpile"
   ],
   "dependencies": {
-    "got": "^6.6.3"
+    "got": "^6.7.1"
   },
   "devDependencies": {
-    "ava": "^0.17.0",
-    "mock-fs": "^3.12.1",
-    "nock": "^9.0.2",
-    "nyc": "^10.0.0",
-    "semistandard": "^9.2.1"
+    "ava": "^0.18.2",
+    "mock-fs": "^4.1.0",
+    "nock": "^9.0.9",
+    "nyc": "^10.1.2",
+    "semistandard": "^9.2.1",
+    "sinon": "^1.17.7"
   },
   "license": "Apache-2.0",
   "engines": {

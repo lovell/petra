@@ -4,6 +4,7 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const childProcess = require('child_process');
 
 const got = require('got');
 
@@ -71,25 +72,15 @@ const sha256 = function (str) {
 const noop = () => {};
 
 const purgeStale = function (directory) {
-  fs.readdir(directory, (err, files) => {
-    if (!err) {
-      files.forEach((file) => {
-        const filePath = path.join(directory, file);
-        fs.stat(filePath, (err, stats) => {
-          if (!err && stats && stats.isDirectory()) {
-            // Recurse into directory
-            purgeStale(filePath);
-          } else if (stats && stats.isFile() && stats.mtime.getTime() < Date.now()) {
-            // Remove stale file
-            locker.lock(filePath, function () {
-              fs.unlink(filePath, function () {
-                locker.unlock(filePath);
-              });
-            });
-          }
-        });
+  childProcess.spawn('find', [`"${directory}"`, '-type', 'f', '-mtime', '+1', '-print'], {
+    stdio: ['ignore', 'pipe', 'ignore']
+  }).stdout.on('data', function (staleFilePath) {
+    // Remove stale file
+    locker.lock(staleFilePath, function () {
+      fs.unlink(staleFilePath, function () {
+        locker.unlock(staleFilePath);
       });
-    }
+    });
   });
 };
 
