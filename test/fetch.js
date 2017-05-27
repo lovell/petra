@@ -15,7 +15,7 @@ const url = host + path;
 const fingerprint = 'test-fingerprint';
 const cacheDirectory = '/tmp/petra';
 const cacheFilename = cacheDirectory + '/te/' + fingerprint;
-const content = new Buffer('test-image-content');
+const content = Buffer.from('test-image-content');
 const hash = function () {
   return fingerprint;
 };
@@ -299,7 +299,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
 });
 
 ava.cb.serial('unaccepted media-type from upstream', t => {
-  t.plan(2);
+  t.plan(4);
 
   const acceptedMediaType = 'test/ok';
   const unacceptedMediaType = 'test/fail';
@@ -319,6 +319,8 @@ ava.cb.serial('unaccepted media-type from upstream', t => {
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify error
     t.true(err instanceof Error);
+    t.regex(err.message, new RegExp('Upstream http://example.com/path failed'));
+    t.regex(err.message, new RegExp('Unsupported media-type test/fail'));
     // Verify upstream request occured
     t.true(upstream.isDone());
     // Cleanup

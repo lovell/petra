@@ -197,7 +197,7 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   upstream.on('response', (response) => {
     if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
       // Unsupported Content-Type header from upstream
-      upstream.emit('error', new Error(`Upstream ${url} unsupported media-type ${response.headers['content-type']}`));
+      upstream.emit('error', new Error(`Unsupported media-type ${response.headers['content-type']}`));
     } else {
       // Upstream ready to pipe data from
       upstream.pause();
@@ -231,9 +231,9 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
     }
   }).once('error', (err) => {
     fs.unlink(partialContentFilename, () => {
-      done(new Error(`Upstream ${url} failed ${err.code}`));
+      done(new Error(`Upstream ${url} failed: ${err.code || err.message}`));
     });
-  });
+  }).on('error', () => {});
 };
 
 Petra.prototype.purge = function (url, done) {

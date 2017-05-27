@@ -11,7 +11,7 @@ import ava from 'ava';
 import Petra from '../';
 
 // Test data
-const content = new Buffer('test-image-content');
+const content = Buffer.from('test-image-content');
 const cacheDirectory = '/tmp/petra';
 const purgeStaleInterval = 1;
 
