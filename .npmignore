@@ -3,3 +3,5 @@ test
 coverage
 .gitignore
 .nyc_output
+.travis.yml
+package-lock.json

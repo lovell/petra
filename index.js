@@ -91,8 +91,8 @@ const isNumberOrDefault = (val, def) => typeof val === 'number' ? val : def;
 const Petra = function (options) {
   // Parse options
   options = options || {};
-  this.minimumTtl = isNumberOrDefault(options.minimumTtl, 7 * 24 * 60 * 60);  // 7 days, in seconds
-  this.purgeStaleInterval = isNumberOrDefault(options.purgeStaleInterval, 60 * 60);  // 1 hour, in seconds
+  this.minimumTtl = isNumberOrDefault(options.minimumTtl, 7 * 24 * 60 * 60); // 7 days, in seconds
+  this.purgeStaleInterval = isNumberOrDefault(options.purgeStaleInterval, 60 * 60); // 1 hour, in seconds
   this.mediaTypes = options.mediaTypes || [];
   this.log = options.log || console.log;
   this.debug = options.debug ? this.log : noop;
@@ -189,12 +189,15 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
     }
   });
   if (this.responseTimeout > 0) {
-    upstream.on('request', (request) => {
-      const abortTimeoutId = setTimeout(request.abort, this.responseTimeout);
+    upstream.once('request', (request) => {
+      const abortTimeoutId = setTimeout(() => {
+        request.abort();
+        upstream.emit('error', new Error('Response timeout'));
+      }, this.responseTimeout);
       upstream.on('close', () => clearTimeout(abortTimeoutId));
     });
   }
-  upstream.on('response', (response) => {
+  upstream.once('response', (response) => {
     if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
       // Unsupported Content-Type header from upstream
       upstream.emit('error', new Error(`Unsupported media-type ${response.headers['content-type']}`));
@@ -203,7 +206,7 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
       upstream.pause();
       // Create input file and listen for finish event
       const file = fs.createWriteStream(partialContentFilename);
-      file.on('finish', () => {
+      file.on('close', () => {
         // Rename completed file
         fs.rename(partialContentFilename, filename, (err) => {
           if (err) {

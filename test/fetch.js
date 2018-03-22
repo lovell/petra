@@ -42,7 +42,7 @@ ava.cb.serial('successful fetch from upstream', t => {
     // Verify dates
     t.true(atime instanceof Date);
     t.true(mtime instanceof Date);
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -79,8 +79,8 @@ ava.cb.serial('successful fetch from filesystem', t => {
     // Verify file contents
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify dates
-    t.is(atime, actualAtime);
-    t.is(mtime, actualMtime);
+    t.is(atime.toISOString(), actualAtime.toISOString());
+    t.is(mtime.toISOString(), actualMtime.toISOString());
     // Verify upstream request did not occur
     t.false(upstream.isDone());
     // Cleanup
@@ -141,7 +141,7 @@ ava.cb.serial('failed fetch from upstream due to 404', t => {
   petra.fetch(url, (err) => {
     // Verify error
     t.true(err instanceof Error);
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -183,10 +183,10 @@ ava.cb.serial('failed fetch from upstream due to initial delay > timeout', t => 
     responseTimeout: 1000
   });
 
-  petra.fetch(url, (err) => {
+  petra.fetch(url, (err, blah) => {
     // Verify error
     t.true(err instanceof Error);
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -219,7 +219,7 @@ ava.cb.serial('Concurrent fetch for same URL result in 1 upstream', t => {
       // Verify dates
       t.true(atime instanceof Date);
       t.true(mtime instanceof Date);
-      // Verify upstream request occured
+      // Verify upstream request occurred
       t.true(upstream.isDone());
       // Cleanup, if last
       remaining--;
@@ -255,7 +255,7 @@ ava.cb.serial('use default sha256 hash function', t => {
     // Verify dates
     t.true(atime instanceof Date);
     t.true(mtime instanceof Date);
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -290,7 +290,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
     // Verify dates
     t.true(atime instanceof Date);
     t.true(mtime instanceof Date);
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -321,7 +321,7 @@ ava.cb.serial('unaccepted media-type from upstream', t => {
     t.true(err instanceof Error);
     t.regex(err.message, new RegExp('Upstream http://example.com/path failed'));
     t.regex(err.message, new RegExp('Unsupported media-type test/fail'));
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -355,7 +355,7 @@ ava.cb.serial('upstream responds with "cache-control: private", use min TTL', t 
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify expiry in minimumTtl seconds
     t.is(atime.getTime() + minimumTtl * 1000, mtime.getTime());
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -389,7 +389,7 @@ ava.cb.serial('upstream responds with "cache-control: no-cache", use min TTL', t
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify expiry in minimumTtl seconds
     t.is(atime.getTime() + minimumTtl * 1000, mtime.getTime());
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -423,7 +423,7 @@ ava.cb.serial('upstream responds with "cache-control: unknown", use min TTL', t 
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify expiry in minimumTtl seconds
     t.is(atime.getTime() + minimumTtl * 1000, mtime.getTime());
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -457,7 +457,7 @@ ava.cb.serial('upstream responds with "cache-control: max-age=2"', t => {
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify expiry in 2s
     t.is(atime.getTime() + 2000, mtime.getTime());
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
@@ -491,7 +491,7 @@ ava.cb.serial('upstream responds with "cache-control: s-maxage=2"', t => {
     t.is(0, Buffer.compare(content, fs.readFileSync(filename)));
     // Verify expiry in 2s
     t.is(atime.getTime() + 2000, mtime.getTime());
-    // Verify upstream request occured
+    // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
     mockFs.restore();
