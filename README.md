@@ -97,7 +97,7 @@ Removes cached copy of the URL, if any, from the local filesystem only.
 
 ## Licence
 
-Copyright 2015, 2016, 2017 Lovell Fuller.
+Copyright 2015, 2016, 2017, 2018 Lovell Fuller.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

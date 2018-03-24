@@ -200,7 +200,7 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   upstream.once('response', (response) => {
     if (this.mediaTypes.length > 0 && this.mediaTypes.indexOf(response.headers['content-type']) === -1) {
       // Unsupported Content-Type header from upstream
-      upstream.emit('error', new Error(`Unsupported media-type ${response.headers['content-type']}`));
+      upstream.destroy(new Error(`Unsupported media-type ${response.headers['content-type']}`));
     } else {
       // Upstream ready to pipe data from
       upstream.pause();
