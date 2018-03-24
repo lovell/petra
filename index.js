@@ -189,12 +189,14 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
     }
   });
   if (this.responseTimeout > 0) {
-    upstream.once('request', (request) => {
-      const abortTimeoutId = setTimeout(() => {
+    upstream.once('request', request => {
+      const responseTimeoutId = setTimeout(() => {
         request.abort();
-        upstream.emit('error', new Error('Response timeout'));
+        upstream.destroy(new Error(`Response timeout of ${this.responseTimeout}ms reached`));
       }, this.responseTimeout);
-      upstream.on('close', () => clearTimeout(abortTimeoutId));
+      const clearResponseTimeout = () => clearTimeout(responseTimeoutId);
+      upstream.on('close', clearResponseTimeout);
+      upstream.on('error', clearResponseTimeout);
     });
   }
   upstream.once('response', (response) => {
