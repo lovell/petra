@@ -157,7 +157,7 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
   const petra = new Petra({
     cacheDirectory,
     hash,
-    requestTimeout: 1000
+    requestTimeout: 100
   });
 
   petra.fetch(url, (err) => {
@@ -169,23 +169,24 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream due to initial delay > timeout', t => {
-  t.plan(2);
+ava.cb.serial('failed fetch from upstream due to download time > response timeout', t => {
+  t.plan(3);
 
   mockFs({});
   const upstream = nock(host)
     .get(path)
-    .delay({ body: 2000 })
+    .delayBody(200)
     .reply(200, content);
   const petra = new Petra({
     cacheDirectory,
     hash,
-    responseTimeout: 1000
+    responseTimeout: 100
   });
 
-  petra.fetch(url, (err, blah) => {
+  petra.fetch(url, err => {
     // Verify error
     t.true(err instanceof Error);
+    t.is(err.message, 'Upstream http://example.com/path failed: response timeout of 100ms');
     // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
@@ -299,7 +300,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
 });
 
 ava.cb.serial('unaccepted media-type from upstream', t => {
-  t.plan(4);
+  t.plan(3);
 
   const acceptedMediaType = 'test/ok';
   const unacceptedMediaType = 'test/fail';
@@ -319,8 +320,7 @@ ava.cb.serial('unaccepted media-type from upstream', t => {
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify error
     t.true(err instanceof Error);
-    t.regex(err.message, new RegExp('Upstream http://example.com/path failed'));
-    t.regex(err.message, new RegExp('Unsupported media-type test/fail'));
+    t.is(err.message, 'Upstream http://example.com/path failed: unsupported media-type test/fail');
     // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup

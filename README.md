@@ -64,10 +64,6 @@ The length of time to wait to connect to an upstream source, defaulting to 10000
 
 The length of time to wait, after connecting, for an upstream source to provide data, defaulting to 10000ms.
 
-#### retries
-
-The number of attempts that will be made to connect to an upstream source, defaulting to none.
-
 #### userAgent
 
 The `User-Agent` header for upstream requests, defaulting to `lovell/petra`.
