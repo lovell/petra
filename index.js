@@ -86,6 +86,12 @@ const purgeStale = function (directory) {
 
 const isNumberOrDefault = (val, def) => typeof val === 'number' ? val : def;
 
+const errorWithCode = (message, code) => {
+  const errorWithCode = new Error(message);
+  errorWithCode.code = code;
+  return errorWithCode;
+};
+
 // Petra object
 
 const Petra = function (options) {
@@ -182,7 +188,8 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
   const partialContentFilename = `${filename}.part`;
   const onError = err => {
     fs.unlink(partialContentFilename, () => {
-      done(new Error(`Upstream ${url} failed: ${err.message}`));
+      err.message = `Upstream ${url} failed: ${err.message}`;
+      done(err);
     });
   };
   const req = get({
@@ -193,27 +200,28 @@ Petra.prototype._fetchFromUpstream = function (url, filename, done) {
     }
   }, (err, res) => {
     if (err) {
-      return onError(err);
+      const code = err.code && ['ECONNREFUSED', 'ETIMEDOUT', 'ESOCKETTIMEDOUT'].includes(err.code) ? 504 : 502;
+      return onError(errorWithCode(err.message, code));
     }
     // Verify upstream status
     if (res.statusCode !== 200) {
       req.abort();
-      return onError(new Error(`status code ${res.statusCode}`));
+      return onError(errorWithCode(`status code ${res.statusCode}`, res.statusCode));
     }
     // Verify upstream Content-Type header
     if (this.mediaTypes.length > 0 && !this.mediaTypes.includes(res.headers['content-type'])) {
       req.abort();
-      return onError(new Error(`unsupported media-type ${res.headers['content-type']}`));
+      return onError(errorWithCode(`unsupported media-type ${res.headers['content-type']}`, 415));
     }
     // Set response timeout, if any
     if (this.responseTimeout > 0) {
       const responseTimeoutId = setTimeout(() => {
         req.abort();
-        onError(new Error(`response timeout of ${this.responseTimeout}ms`));
+        onError(errorWithCode(`response timeout of ${this.responseTimeout}ms`, 504));
       }, this.responseTimeout);
-      res.on('end', () => {
-        clearTimeout(responseTimeoutId);
-      });
+      const clearResponseTimeout = () => clearTimeout(responseTimeoutId);
+      res.on('end', clearResponseTimeout);
+      res.on('error', clearResponseTimeout);
     }
     // Create input file and listen for finish event
     const file = fs.createWriteStream(partialContentFilename);

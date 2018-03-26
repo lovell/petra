@@ -127,7 +127,7 @@ ava.cb.serial('successful fetch from upstream due to expired cache', t => {
 });
 
 ava.cb.serial('failed fetch from upstream due to 404', t => {
-  t.plan(2);
+  t.plan(4);
 
   mockFs({});
   const upstream = nock(host)
@@ -141,6 +141,58 @@ ava.cb.serial('failed fetch from upstream due to 404', t => {
   petra.fetch(url, (err) => {
     // Verify error
     t.true(err instanceof Error);
+    t.is(err.message, 'Upstream http://example.com/path failed: status code 404');
+    t.is(err.code, 404);
+    // Verify upstream request occurred
+    t.true(upstream.isDone());
+    // Cleanup
+    mockFs.restore();
+    t.end();
+  });
+});
+
+ava.cb.serial('failed fetch from upstream due to 500', t => {
+  t.plan(4);
+
+  mockFs({});
+  const upstream = nock(host)
+    .get(path)
+    .reply(500);
+  const petra = new Petra({
+    cacheDirectory,
+    hash
+  });
+
+  petra.fetch(url, (err) => {
+    // Verify error
+    t.true(err instanceof Error);
+    t.is(err.message, 'Upstream http://example.com/path failed: status code 500');
+    t.is(err.code, 500);
+    // Verify upstream request occurred
+    t.true(upstream.isDone());
+    // Cleanup
+    mockFs.restore();
+    t.end();
+  });
+});
+
+ava.cb.serial('failed fetch from upstream with named error code', t => {
+  t.plan(4);
+
+  mockFs({});
+  const upstream = nock(host)
+    .get(path)
+    .replyWithError({ message: 'test error', code: 'ETEST' });
+  const petra = new Petra({
+    cacheDirectory,
+    hash
+  });
+
+  petra.fetch(url, (err) => {
+    // Verify error
+    t.true(err instanceof Error);
+    t.is(err.message, 'Upstream http://example.com/path failed: test error');
+    t.is(err.code, 502);
     // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
@@ -150,7 +202,7 @@ ava.cb.serial('failed fetch from upstream due to 404', t => {
 });
 
 ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
-  t.plan(1);
+  t.plan(3);
 
   const url = 'http://127.0.0.1:50000/path';
   mockFs({});
@@ -163,6 +215,8 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
   petra.fetch(url, (err) => {
     // Verify error
     t.true(err instanceof Error);
+    t.is(err.message, 'Upstream http://127.0.0.1:50000/path failed: connect ECONNREFUSED 127.0.0.1:50000');
+    t.is(err.code, 504);
     // Cleanup
     mockFs.restore();
     t.end();
@@ -170,7 +224,7 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
 });
 
 ava.cb.serial('failed fetch from upstream due to download time > response timeout', t => {
-  t.plan(3);
+  t.plan(4);
 
   mockFs({});
   const upstream = nock(host)
@@ -187,6 +241,7 @@ ava.cb.serial('failed fetch from upstream due to download time > response timeou
     // Verify error
     t.true(err instanceof Error);
     t.is(err.message, 'Upstream http://example.com/path failed: response timeout of 100ms');
+    t.is(err.code, 504);
     // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
@@ -300,7 +355,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
 });
 
 ava.cb.serial('unaccepted media-type from upstream', t => {
-  t.plan(3);
+  t.plan(4);
 
   const acceptedMediaType = 'test/ok';
   const unacceptedMediaType = 'test/fail';
@@ -321,6 +376,7 @@ ava.cb.serial('unaccepted media-type from upstream', t => {
     // Verify error
     t.true(err instanceof Error);
     t.is(err.message, 'Upstream http://example.com/path failed: unsupported media-type test/fail');
+    t.is(err.code, 415);
     // Verify upstream request occurred
     t.true(upstream.isDone());
     // Cleanup
