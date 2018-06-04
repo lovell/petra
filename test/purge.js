@@ -40,10 +40,11 @@ ava.cb.serial('purge all stale content from cache', t => {
     })
   });
 
+  const noop = () => {};
   const staleFileEmitter = new EventEmitter();
   const spawnStub = sinon
     .stub(childProcess, 'spawn')
-    .returns({ stdout: staleFileEmitter });
+    .returns({ on: noop, stdout: staleFileEmitter });
 
   // Create cache with 1s purge interval
   const petra = new Petra({ // eslint-disable-line no-unused-vars

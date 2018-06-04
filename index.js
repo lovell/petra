@@ -71,10 +71,14 @@ const sha256 = function (str) {
 
 const noop = () => {};
 
-const purgeStale = function (directory) {
-  childProcess.spawn('find', [`"${directory}"`, '-type', 'f', '-mtime', '+1', '-print'], {
+const purgeStale = function (directory, log) {
+  const finder = childProcess.spawn('find', [`"${directory}"`, '-type', 'f', '-mtime', '+1', '-print'], {
     stdio: ['ignore', 'pipe', 'ignore']
-  }).stdout.on('data', function (staleFilePath) {
+  });
+  finder.on('error', function (err) {
+    log(`Purge of stale items failed: ${err.message}`);
+  });
+  finder.stdout.on('data', function (staleFilePath) {
     // Remove stale file
     locker.lock(staleFilePath, function () {
       fs.unlink(staleFilePath, function () {
@@ -115,7 +119,7 @@ const Petra = function (options) {
   this.hash = (typeof options.hash === 'function') ? options.hash : sha256;
   // Start purge cache task
   this.purgeStaleTask = setInterval(() => {
-    purgeStale(this.cacheDirectory);
+    purgeStale(this.cacheDirectory, this.log);
   }, this.purgeStaleInterval * 1000);
 };
 module.exports = Petra;
