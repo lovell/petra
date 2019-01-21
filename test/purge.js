@@ -15,7 +15,7 @@ const content = Buffer.from('test-image-content');
 const cacheDirectory = '/tmp/petra';
 const purgeStaleInterval = 1;
 
-ava.cb.serial('purge all stale content from cache', t => {
+ava.serial.cb('purge all stale content from cache', t => {
   t.plan(3);
 
   const keepMeFilename = cacheDirectory + '/ke/keep-me';
@@ -83,7 +83,7 @@ ava.cb.serial('purge all stale content from cache', t => {
   }, 4000);
 });
 
-ava.cb.serial('purge one item from cache', t => {
+ava.serial.cb('purge one item from cache', t => {
   t.plan(3);
 
   const keepMeFilename = cacheDirectory + '/ke/keep-me';
@@ -102,7 +102,7 @@ ava.cb.serial('purge one item from cache', t => {
 
   petra.purge('purge', (err) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify keep-me was kept
     t.notThrows(function () {
       fs.accessSync(keepMeFilename, fs.constants.F_OK);
@@ -117,7 +117,7 @@ ava.cb.serial('purge one item from cache', t => {
   });
 });
 
-ava.cb.serial('purge non-existent item from cache', t => {
+ava.serial.cb('purge non-existent item from cache', t => {
   t.plan(1);
 
   mockFs({});
@@ -127,7 +127,7 @@ ava.cb.serial('purge non-existent item from cache', t => {
 
   petra.purge('purge', (err) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Cleanup
     mockFs.restore();
     t.end();

@@ -20,7 +20,7 @@ const hash = function () {
   return fingerprint;
 };
 
-ava.cb.serial('successful fetch from upstream', t => {
+ava.serial.cb('successful fetch from upstream', t => {
   t.plan(6);
 
   mockFs({});
@@ -34,7 +34,7 @@ ava.cb.serial('successful fetch from upstream', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -50,7 +50,7 @@ ava.cb.serial('successful fetch from upstream', t => {
   });
 });
 
-ava.cb.serial('successful fetch from filesystem', t => {
+ava.serial.cb('successful fetch from filesystem', t => {
   t.plan(6);
 
   const atime = new Date();
@@ -73,7 +73,7 @@ ava.cb.serial('successful fetch from filesystem', t => {
 
   petra.fetch(url, (err, filename, actualAtime, actualMtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -90,7 +90,7 @@ ava.cb.serial('successful fetch from filesystem', t => {
   });
 });
 
-ava.cb.serial('successful fetch from upstream due to expired cache', t => {
+ava.serial.cb('successful fetch from upstream due to expired cache', t => {
   t.plan(6);
 
   mockFs({
@@ -110,7 +110,7 @@ ava.cb.serial('successful fetch from upstream due to expired cache', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -126,7 +126,7 @@ ava.cb.serial('successful fetch from upstream due to expired cache', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream due to 404', t => {
+ava.serial.cb('failed fetch from upstream due to 404', t => {
   t.plan(4);
 
   mockFs({});
@@ -151,7 +151,7 @@ ava.cb.serial('failed fetch from upstream due to 404', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream due to 500', t => {
+ava.serial.cb('failed fetch from upstream due to 500', t => {
   t.plan(4);
 
   mockFs({});
@@ -176,7 +176,7 @@ ava.cb.serial('failed fetch from upstream due to 500', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream with named error code', t => {
+ava.serial.cb('failed fetch from upstream with named error code', t => {
   t.plan(4);
 
   mockFs({});
@@ -201,7 +201,7 @@ ava.cb.serial('failed fetch from upstream with named error code', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
+ava.serial.cb('failed fetch from upstream due to socket timeout', t => {
   t.plan(3);
 
   const url = 'http://127.0.0.1:50000/path';
@@ -223,7 +223,7 @@ ava.cb.serial('failed fetch from upstream due to socket timeout', t => {
   });
 });
 
-ava.cb.serial('failed fetch from upstream due to download time > response timeout', t => {
+ava.serial.cb('failed fetch from upstream due to download time > response timeout', t => {
   t.plan(4);
 
   mockFs({});
@@ -250,7 +250,7 @@ ava.cb.serial('failed fetch from upstream due to download time > response timeou
   });
 });
 
-ava.cb.serial('Concurrent fetch for same URL result in 1 upstream', t => {
+ava.serial.cb('Concurrent fetch for same URL result in 1 upstream', t => {
   const concurrency = 20;
   t.plan(concurrency * 6);
 
@@ -267,7 +267,7 @@ ava.cb.serial('Concurrent fetch for same URL result in 1 upstream', t => {
   const test = function () {
     petra.fetch(url, (err, filename, atime, mtime) => {
       // Verify no error
-      t.ifError(err);
+      t.falsy(err);
       // Verify filename
       t.is(filename, cacheFilename);
       // Verify file contents
@@ -289,7 +289,7 @@ ava.cb.serial('Concurrent fetch for same URL result in 1 upstream', t => {
   [...Array(concurrency).keys()].forEach(test);
 });
 
-ava.cb.serial('use default sha256 hash function', t => {
+ava.serial.cb('use default sha256 hash function', t => {
   t.plan(6);
   const expectedCachePath = '/7d/7db5de67837e9b1d9b64416db779f447851c711519ad6985bc2d63207577cca0';
 
@@ -303,7 +303,7 @@ ava.cb.serial('use default sha256 hash function', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheDirectory + expectedCachePath);
     // Verify file contents
@@ -319,7 +319,7 @@ ava.cb.serial('use default sha256 hash function', t => {
   });
 });
 
-ava.cb.serial('accepted media-type from upstream', t => {
+ava.serial.cb('accepted media-type from upstream', t => {
   t.plan(6);
 
   const acceptedMediaType = 'test/ok';
@@ -338,7 +338,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -354,7 +354,7 @@ ava.cb.serial('accepted media-type from upstream', t => {
   });
 });
 
-ava.cb.serial('unaccepted media-type from upstream', t => {
+ava.serial.cb('unaccepted media-type from upstream', t => {
   t.plan(4);
 
   const acceptedMediaType = 'test/ok';
@@ -385,7 +385,7 @@ ava.cb.serial('unaccepted media-type from upstream', t => {
   });
 });
 
-ava.cb.serial('upstream responds with "cache-control: private", use min TTL', t => {
+ava.serial.cb('upstream responds with "cache-control: private", use min TTL', t => {
   t.plan(5);
 
   const minimumTtl = 10;
@@ -404,7 +404,7 @@ ava.cb.serial('upstream responds with "cache-control: private", use min TTL', t 
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -419,7 +419,7 @@ ava.cb.serial('upstream responds with "cache-control: private", use min TTL', t 
   });
 });
 
-ava.cb.serial('upstream responds with "cache-control: no-cache", use min TTL', t => {
+ava.serial.cb('upstream responds with "cache-control: no-cache", use min TTL', t => {
   t.plan(5);
 
   const minimumTtl = 10;
@@ -438,7 +438,7 @@ ava.cb.serial('upstream responds with "cache-control: no-cache", use min TTL', t
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -453,7 +453,7 @@ ava.cb.serial('upstream responds with "cache-control: no-cache", use min TTL', t
   });
 });
 
-ava.cb.serial('upstream responds with "cache-control: unknown", use min TTL', t => {
+ava.serial.cb('upstream responds with "cache-control: unknown", use min TTL', t => {
   t.plan(5);
 
   const minimumTtl = 10;
@@ -472,7 +472,7 @@ ava.cb.serial('upstream responds with "cache-control: unknown", use min TTL', t 
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -487,7 +487,7 @@ ava.cb.serial('upstream responds with "cache-control: unknown", use min TTL', t 
   });
 });
 
-ava.cb.serial('upstream responds with "cache-control: max-age=2"', t => {
+ava.serial.cb('upstream responds with "cache-control: max-age=2"', t => {
   t.plan(5);
 
   const minimumTtl = 1;
@@ -506,7 +506,7 @@ ava.cb.serial('upstream responds with "cache-control: max-age=2"', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents
@@ -521,7 +521,7 @@ ava.cb.serial('upstream responds with "cache-control: max-age=2"', t => {
   });
 });
 
-ava.cb.serial('upstream responds with "cache-control: s-maxage=2"', t => {
+ava.serial.cb('upstream responds with "cache-control: s-maxage=2"', t => {
   t.plan(5);
 
   const minimumTtl = 1;
@@ -540,7 +540,7 @@ ava.cb.serial('upstream responds with "cache-control: s-maxage=2"', t => {
 
   petra.fetch(url, (err, filename, atime, mtime) => {
     // Verify no error
-    t.ifError(err);
+    t.falsy(err);
     // Verify filename
     t.is(filename, cacheFilename);
     // Verify file contents

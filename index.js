@@ -72,20 +72,24 @@ const sha256 = function (str) {
 const noop = () => {};
 
 const purgeStale = function (directory, log) {
-  const finder = childProcess.spawn('find', [`"${directory}"`, '-type', 'f', '-mtime', '+1', '-print'], {
-    stdio: ['ignore', 'pipe', 'ignore']
-  });
-  finder.on('error', function (err) {
-    log(`Purge of stale items failed: ${err.message}`);
-  });
-  finder.stdout.on('data', function (staleFilePath) {
-    // Remove stale file
-    locker.lock(staleFilePath, function () {
-      fs.unlink(staleFilePath, function () {
-        locker.unlock(staleFilePath);
+  try {
+    const finder = childProcess.spawn('find', [`"${directory}"`, '-type', 'f', '-mtime', '+1', '-print'], {
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+    finder.on('error', function (err) {
+      log(`Purge of stale items failed: ${err.message}`);
+    });
+    finder.stdout.on('data', function (staleFilePath) {
+      // Remove stale file
+      locker.lock(staleFilePath, function () {
+        fs.unlink(staleFilePath, function () {
+          locker.unlock(staleFilePath);
+        });
       });
     });
-  });
+  } catch (err) {
+    log(`Purge of stale items failed: ${err.message}`);
+  }
 };
 
 const isNumberOrDefault = (val, def) => typeof val === 'number' ? val : def;
